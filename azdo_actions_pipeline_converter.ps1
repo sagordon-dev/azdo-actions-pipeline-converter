@@ -81,6 +81,14 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         }
     }
 
+    if ($Pipeline.ContainsKey('variableGroups')) {
+        foreach ($group in $Pipeline.variableGroups) {
+            foreach ($variable in $group.variables) {
+                $workflow.env[$variable.name] = $variable.value
+            }
+        }
+    }
+
     if ($Pipeline.ContainsKey('resources')) {
         $workflow.resources = @{}
         if ($Pipeline.resources.ContainsKey('repositories')) {
