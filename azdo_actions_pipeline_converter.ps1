@@ -164,7 +164,15 @@ function Write-GitHubActionsWorkflow {
     )
 
     try {
+        if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+            throw "Output file path is empty or null."
+        }
+
         $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
+        if ([string]::IsNullOrWhiteSpace($outputDir)) {
+            throw "Output directory path is empty or null."
+        }
+
         if (-Not (Test-Path -Path $outputDir)) {
             New-Item -ItemType Directory -Path $outputDir -Force
         }
