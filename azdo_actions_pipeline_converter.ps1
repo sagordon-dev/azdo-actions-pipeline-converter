@@ -164,6 +164,11 @@ function Write-GitHubActionsWorkflow {
     )
 
     try {
+        $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
+        if (-Not (Test-Path -Path $outputDir)) {
+            New-Item -ItemType Directory -Path $outputDir -Force
+        }
+
         $yamlContent = ConvertTo-Yaml -Object $Workflow
         Set-Content -Path $OutputFile -Value $yamlContent
     } catch {
