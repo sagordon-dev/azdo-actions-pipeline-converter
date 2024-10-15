@@ -1,0 +1,54 @@
+{
+  "name": "Sample Pipeline",
+  "resources": {
+    "repositories": {
+      "self": {
+        "type": "git",
+        "refName": "refs/heads/main"
+      }
+    }
+  },
+  "trigger": {
+    "branches": {
+      "include": ["main"]
+    }
+  },
+  "jobs": [
+    {
+      "job": "Build",
+      "pool": {
+        "vmImage": "ubuntu-latest"
+      },
+      "steps": [
+        {
+          "task": "UseDotNet@2",
+          "inputs": {
+            "packageType": "sdk",
+            "version": "5.x"
+          }
+        },
+        {
+          "task": "DotNetCoreCLI@2",
+          "inputs": {
+            "command": "restore",
+            "projects": "**/*.csproj"
+          }
+        },
+        {
+          "task": "DotNetCoreCLI@2",
+          "inputs": {
+            "command": "build",
+            "projects": "**/*.csproj"
+          }
+        },
+        {
+          "task": "DotNetCoreCLI@2",
+          "inputs": {
+            "command": "test",
+            "projects": "**/*.csproj"
+          }
+        }
+      ]
+    }
+  ]
+}
