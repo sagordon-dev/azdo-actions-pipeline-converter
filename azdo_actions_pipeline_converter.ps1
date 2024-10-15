@@ -120,7 +120,7 @@ function Write-GitHubActionsWorkflow {
     )
 
     try {
-        $yamlContent = $Workflow | ConvertTo-Yaml
+        $yamlContent = ConvertTo-Yaml -Object $Workflow
         Set-Content -Path $OutputFile -Value $yamlContent
     } catch {
         throw "Error: $_"
