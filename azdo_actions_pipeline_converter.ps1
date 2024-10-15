@@ -55,8 +55,23 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
 
     $workflow = @{
         name = $Pipeline.name
-        on   = @('push', 'pull_request')
+        on   = @{
+            push = @{
+                branches = @('main')
+            }
+            pull_request = @{
+                branches = @('main')
+            }
+        }
         jobs = @{}
+    }
+
+    if ($Pipeline.ContainsKey('trigger')) {
+        $workflow.on.push.branches = $Pipeline.trigger.branches
+    }
+
+    if ($Pipeline.ContainsKey('pr')) {
+        $workflow.on.pull_request.branches = $Pipeline.pr.branches
     }
 
     if ($Pipeline.ContainsKey('phases')) {
