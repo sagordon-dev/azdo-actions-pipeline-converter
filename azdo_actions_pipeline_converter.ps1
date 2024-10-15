@@ -53,29 +53,61 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         [hashtable]$Pipeline
     )
 
-    if (-Not $Pipeline.ContainsKey('phases')) {
-        throw "Error: 'phases' key not found in pipeline. Pipeline content: $Pipeline"
-    }
-
     $workflow = @{
         name = $Pipeline.name
         on   = @('push', 'pull_request')
-        jobs = @{
-            build = @{
+        jobs = @{}
+    }
+
+    if ($Pipeline.ContainsKey('phases')) {
+        $phases = $Pipeline.phases
+        foreach ($phase in $phases) {
+            $jobName = $phase.name
+            $workflow.jobs[$jobName] = @{
                 'runs-on' = 'ubuntu-latest'
                 steps     = @()
             }
+            foreach ($step in $phase.steps) {
+                $workflow.jobs[$jobName].steps += @{
+                    name = $step.displayName
+                    run  = $step.script
+                }
+            }
         }
-    }
-
-    $phases = $Pipeline.phases
-
-    foreach ($step in $phases[0].steps) {
-        $stepDict = @{
-            name = $step.displayName
-            run  = $step.script
+    } elseif ($Pipeline.ContainsKey('jobs')) {
+        $jobs = $Pipeline.jobs
+        foreach ($job in $jobs) {
+            $jobName = $job.job
+            $workflow.jobs[$jobName] = @{
+                'runs-on' = 'ubuntu-latest'
+                steps     = @()
+            }
+            foreach ($step in $job.steps) {
+                $workflow.jobs[$jobName].steps += @{
+                    name = $step.displayName
+                    run  = $step.script
+                }
+            }
         }
-        $workflow.jobs.build.steps += $stepDict
+    } elseif ($Pipeline.ContainsKey('stages')) {
+        $stages = $Pipeline.stages
+        foreach ($stage in $stages) {
+            foreach ($job in $stage.jobs) {
+                $jobName = $job.job
+                $workflow.jobs[$jobName] = @{
+                    'runs-on' = 'ubuntu-latest'
+                    steps     = @()
+                }
+                foreach ($step in $job.steps) {
+                    $workflow.jobs[$jobName].steps += @{
+                        name = $step.displayName
+                        run  = $step.script
+                    }
+                }
+            }
+        }
+    } else {
+        throw "Error: 'phases', 'jobs', or 'stages' key not found in pipeline. Pipeline content: $Pipeline"
     }
 
     return $workflow
@@ -118,4 +150,3 @@ try {
 } catch {
     Write-Error $_
 }
-
