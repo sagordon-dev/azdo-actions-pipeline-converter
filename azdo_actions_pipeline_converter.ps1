@@ -74,6 +74,27 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         $workflow.on.pull_request.branches = $Pipeline.pr.branches
     }
 
+    if ($Pipeline.ContainsKey('variables')) {
+        $workflow.env = @{}
+        foreach ($key in $Pipeline.variables.Keys) {
+            $workflow.env[$key] = $Pipeline.variables[$key]
+        }
+    }
+
+    if ($Pipeline.ContainsKey('resources')) {
+        $workflow.resources = @{}
+        if ($Pipeline.resources.ContainsKey('repositories')) {
+            $workflow.resources.repositories = @()
+            foreach ($repo in $Pipeline.resources.repositories) {
+                $workflow.resources.repositories += @{
+                    repository = $repo.repository
+                    type       = $repo.type
+                    ref        = $repo.ref
+                }
+            }
+        }
+    }
+
     if ($Pipeline.ContainsKey('phases')) {
         $phases = $Pipeline.phases
         foreach ($phase in $phases) {
@@ -148,13 +169,12 @@ function ConvertTo-Yaml {
         [object]$Object
     )
 
-    $yaml = New-Object -TypeName 'System.Text.StringBuilder'
-    $yamlWriter = New-Object -TypeName 'System.IO.StringWriter' -ArgumentList $yaml
+    $yamlWriter = New-Object -TypeName 'System.IO.StringWriter'
     $yamlSerializer = New-Object -TypeName 'YamlDotNet.Serialization.Serializer'
     $yamlSerializer.Serialize($yamlWriter, $Object)
     $yamlWriter.Close()
 
-    return $yaml.ToString()
+    return $yamlWriter.ToString()
 }
 
 try {
