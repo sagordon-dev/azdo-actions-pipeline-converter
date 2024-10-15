@@ -28,119 +28,73 @@ param (
     [string]$ghActionsWorkflowFile
 )
 
-# Check if the Azure DevOps pipeline file exists
-if (-not (Test-Path $azdoPipelineFile)) {
-    Write-Error "Azure DevOps pipeline file '$azdoPipelineFile' not found."
-    exit 1
-}
-
-# Check if the GitHub Actions workflow file exists
-if (-not (Test-Path $ghActionsWorkflowFile)) {
-    Write-Error "GitHub Actions workflow file '$ghActionsWorkflowFile' not found."
-    exit 1
-}
-
-# Load the Azure DevOps pipeline file
-$azdoPipeline = Get-Content $azdoPipelineFile -Raw
-
-# Convert the Azure DevOps pipeline to GitHub Actions workflow
-$ghActionsWorkflow = Convert-AzdoPipelineToGhActionsWorkflow -AzdoPipeline $azdoPipeline
-
-# Save the GitHub Actions workflow to the file
-$ghActionsWorkflow | Set-Content $ghActionsWorkflowFile
-
-Write-Host "Azure DevOps pipeline '$azdoPipelineFile' converted to GitHub Actions workflow '$ghActionsWorkflowFile' successfully."
-
-<#
-.SYNOPSIS
-Converts an Azure DevOps pipeline to a GitHub Actions workflow.
-
-.DESCRIPTION
-This function takes an Azure DevOps pipeline in JSON format and converts it to a GitHub Actions workflow in YAML format.
-
-.PARAMETER AzdoPipeline
-The Azure DevOps pipeline content in JSON format.
-
-.RETURNS
-A string containing the GitHub Actions workflow in YAML format.
-
-.EXAMPLE
-$azdoPipeline = Get-Content "azure-pipelines.json" -Raw
-$ghActionsWorkflow = Convert-AzdoPipelineToGhActionsWorkflow -AzdoPipeline $azdoPipeline
-Write-Host $ghActionsWorkflow
-#>
-function Convert-AzdoPipelineToGhActionsWorkflow {
+function Get-PipelineFile {
     param (
-        [Parameter(Mandatory=$true)]
-        [string]$AzdoPipeline
+        [string]$PipelineFile
     )
 
-    # Convert the Azure DevOps pipeline to JSON format
-    $azdoPipelineJson = ConvertFrom-Json $AzdoPipeline
-
-    # Initialize the GitHub Actions workflow object
-    $ghActionsWorkflow = @{
-        name = $azdoPipelineJson.name
-        on = @{
-            push = @{
-                branches = @('main')
-            }
-        }
-        jobs = @{}
+    if (-Not (Test-Path -Path $PipelineFile)) {
+        throw "The file $PipelineFile does not exist."
     }
 
-    # Loop through the jobs in the Azure DevOps pipeline
-    foreach ($job in $azdoPipelineJson.jobs) {
-        # Initialize the GitHub Actions job object
-        $ghActionsJob = @{
-            name = $job.jobName
-            'runs-on' = 'ubuntu-latest'
-            steps = @()
-        }
+    $extension = [System.IO.Path]::GetExtension($PipelineFile).ToLower()
+    $content = Get-Content -Path $PipelineFile -Raw
 
-        # Loop through the steps in the Azure DevOps job
-        foreach ($step in $job.steps) {
-            # Initialize the GitHub Actions step object
-            $ghActionsStep = @{
-                name = $step.displayName
-                run = $step.script
-            }
-
-            # Add the GitHub Actions step to the job
-            $ghActionsJob.steps += $ghActionsStep
-        }
-
-        # Add the GitHub Actions job to the workflow
-        $ghActionsWorkflow.jobs[$job.jobName] = $ghActionsJob
+    switch ($extension) {
+        ".json" { return $content | ConvertFrom-Json }
+        ".yaml" { return $content | ConvertFrom-Yaml }
+        ".yml"  { return $content | ConvertFrom-Yaml }
+        default { throw "Unsupported file format. Please provide a .json or .yaml file." }
     }
-
-    # Convert the GitHub Actions workflow to YAML format
-    $ghActionsWorkflowYaml = ConvertTo-Yaml -Object $ghActionsWorkflow
-
-    return $ghActionsWorkflowYaml
 }
 
-<#
-.SYNOPSIS
-Converts a PowerShell object to a YAML formatted string.
+function Convert-AzdoPipelineToGhActionsWorkflow {
+    param (
+        [hashtable]$Pipeline
+    )
 
-.DESCRIPTION
-This function takes a PowerShell object and serializes it into a YAML formatted string.
+    if (-Not $Pipeline.ContainsKey('phases')) {
+        throw "Error: 'phases' key not found in pipeline. Pipeline content: $Pipeline"
+    }
 
-.PARAMETER Object
-The PowerShell object to be serialized into YAML format.
+    $workflow = @{
+        name = $Pipeline.name
+        on   = @('push', 'pull_request')
+        jobs = @{
+            build = @{
+                'runs-on' = 'ubuntu-latest'
+                steps     = @()
+            }
+        }
+    }
 
-.RETURNS
-A string containing the YAML representation of the input object.
+    $phases = $Pipeline.phases
 
-.EXAMPLE
-$myObject = @{ Name = "Example"; Value = 123 }
-$yamlString = ConvertTo-Yaml -Object $myObject
-Write-Host $yamlString
+    foreach ($step in $phases[0].steps) {
+        $stepDict = @{
+            name = $step.displayName
+            run  = $step.script
+        }
+        $workflow.jobs.build.steps += $stepDict
+    }
 
-.NOTES
-Ensure that the required modules for YAML serialization are installed and imported.
-#>
+    return $workflow
+}
+
+function Write-GitHubActionsWorkflow {
+    param (
+        [hashtable]$Workflow,
+        [string]$OutputFile
+    )
+
+    try {
+        $yamlContent = $Workflow | ConvertTo-Yaml
+        Set-Content -Path $OutputFile -Value $yamlContent
+    } catch {
+        throw "Error: $_"
+    }
+}
+
 function ConvertTo-Yaml {
     param (
         [Parameter(Mandatory=$true)]
@@ -149,10 +103,19 @@ function ConvertTo-Yaml {
 
     $yaml = New-Object -TypeName 'System.Text.StringBuilder'
     $yamlWriter = New-Object -TypeName 'System.IO.StringWriter' -ArgumentList $yaml
-    $yamlSerializer = New-Object -TypeName 'System.Management.Automation.PSSerializer' -ArgumentList $Object
-    $yamlSerializer.Serialize($yamlWriter)
+    $yamlSerializer = New-Object -TypeName 'YamlDotNet.Serialization.Serializer'
+    $yamlSerializer.Serialize($yamlWriter, $Object)
     $yamlWriter.Close()
 
     return $yaml.ToString()
+}
+
+try {
+    $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
+    $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
+    Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
+    Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
+} catch {
+    Write-Error $_
 }
 
