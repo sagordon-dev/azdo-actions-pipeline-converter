@@ -29,7 +29,7 @@ param (
 )
 
 function Install-RequiredModules {
-    $modules = @('YamlDotNet')
+    $modules = @('powershell-yaml')
 
     foreach ($module in $modules) {
         if (-not (Get-Module -ListAvailable -Name $module)) {
@@ -201,16 +201,13 @@ function ConvertTo-Yaml {
         [object]$Object
     )
 
-    $yamlWriter = New-Object -TypeName 'System.IO.StringWriter'
-    $yamlSerializer = New-Object -TypeName 'YamlDotNet.Serialization.Serializer'
-    $yamlSerializer.Serialize($yamlWriter, $Object)
-    $yamlWriter.Close()
-
-    return $yamlWriter.ToString()
+    $yamlContent = $Object | ConvertTo-Yaml
+    return $yamlContent
 }
 
 try {
     Install-RequiredModules
+    Import-Module powershell-yaml
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
     $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
     Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
