@@ -21,10 +21,10 @@ Ensure that the required modules for YAML serialization are installed and import
 #>
 
 param (
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory=$true)]
     [string]$azdoPipelineFile,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory=$true)]
     [string]$ghActionsWorkflowFile
 )
 
@@ -54,7 +54,7 @@ function Get-PipelineFile {
     switch ($extension) {
         ".json" { return $content | ConvertFrom-Json }
         ".yaml" { return $content | ConvertFrom-Yaml }
-        ".yml" { return $content | ConvertFrom-Yaml }
+        ".yml"  { return $content | ConvertFrom-Yaml }
         default { throw "Unsupported file format. Please provide a .json or .yaml file." }
     }
 }
@@ -67,7 +67,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
     $workflow = @{
         name = $Pipeline.name
         on   = @{
-            push         = @{
+            push = @{
                 branches = @('main')
             }
             pull_request = @{
@@ -129,8 +129,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                 }
             }
         }
-    }
-    elseif ($Pipeline.ContainsKey('jobs')) {
+    } elseif ($Pipeline.ContainsKey('jobs')) {
         $jobs = $Pipeline.jobs
         foreach ($job in $jobs) {
             $jobName = $job.job
@@ -145,8 +144,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                 }
             }
         }
-    }
-    elseif ($Pipeline.ContainsKey('stages')) {
+    } elseif ($Pipeline.ContainsKey('stages')) {
         $stages = $Pipeline.stages
         foreach ($stage in $stages) {
             foreach ($job in $stage.jobs) {
@@ -163,8 +161,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                 }
             }
         }
-    }
-    else {
+    } else {
         throw "Error: 'phases', 'jobs', or 'stages' key not found in pipeline. Pipeline content: $Pipeline"
     }
 
@@ -181,34 +178,26 @@ function Write-GitHubActionsWorkflow {
         if ([string]::IsNullOrWhiteSpace($OutputFile)) {
             throw "Output file path is empty or null."
         }
-    
+
         $outputDir = [System.IO.Path]::GetDirectoryName((Resolve-Path $OutputFile).Path)
         if ([string]::IsNullOrWhiteSpace($outputDir)) {
             throw "Output directory path is empty or null."
         }
-    
+
         if (-Not (Test-Path -Path $outputDir)) {
             $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
             if ($createDir -eq 'Y' -or $createDir -eq 'y') {
                 New-Item -ItemType Directory -Path $outputDir -Force
-            }
-            else {
+            } else {
                 throw "Output directory '$outputDir' does not exist and was not created."
             }
         }
-    
+
         $yamlContent = ConvertTo-Yaml -Object $Workflow
         Set-Content -Path $OutputFile -Value $yamlContent
-    }
-    catch {
+    } catch {
         throw "Error: $_"
     }
-
-    $yamlContent = ConvertTo-Yaml -Object $Workflow
-    Set-Content -Path $OutputFile -Value $yamlContent
-}
-catch {
-    throw "Error: $_"
 }
 
 try {
@@ -218,7 +207,6 @@ try {
     $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
     Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
     Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
-}
-catch {
+} catch {
     Write-Error $_
 }
