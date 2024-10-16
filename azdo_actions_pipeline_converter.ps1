@@ -98,6 +98,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
     }
 
     if ($Pipeline.ContainsKey('phases')) {
+        Write-Host "Processing phases..."
         $phases = $Pipeline.phases
         foreach ($phase in $phases) {
             $jobName = $phase.name
@@ -114,6 +115,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         }
     }
     elseif ($Pipeline.ContainsKey('jobs')) {
+        Write-Host "Processing jobs..."
         $jobs = $Pipeline.jobs
         foreach ($job in $jobs) {
             $jobName = $job.job
@@ -130,6 +132,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         }
     }
     elseif ($Pipeline.ContainsKey('stages')) {
+        Write-Host "Processing stages..."
         $stages = $Pipeline.stages
         foreach ($stage in $stages) {
             foreach ($job in $stage.jobs) {
@@ -158,6 +161,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
 
     return $workflow
 }
+
 
 
 
