@@ -28,6 +28,17 @@ param (
     [string]$ghActionsWorkflowFile
 )
 
+function Install-RequiredModules {
+    $modules = @('YamlDotNet')
+
+    foreach ($module in $modules) {
+        if (-not (Get-Module -ListAvailable -Name $module)) {
+            Write-Host "Installing module: $module"
+            Install-Module -Name $module -Force -Scope CurrentUser
+        }
+    }
+}
+
 function Get-PipelineFile {
     param (
         [string]$PipelineFile
@@ -199,6 +210,7 @@ function ConvertTo-Yaml {
 }
 
 try {
+    Install-RequiredModules
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
     $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
     Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
