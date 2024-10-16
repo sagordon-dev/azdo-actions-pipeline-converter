@@ -180,6 +180,9 @@ function Write-GitHubActionsWorkflow {
         }
 
         $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
+        if (-not $outputDir) {
+            $outputDir = "."
+        }
         if ([string]::IsNullOrWhiteSpace($outputDir)) {
             throw "Output directory path is empty or null."
         }
