@@ -151,8 +151,14 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         throw "Error: 'phases', 'jobs', or 'stages' key not found in pipeline. Pipeline content: $Pipeline"
     }
 
+    # Ensure jobs are not empty
+    if ($workflow.jobs.Count -eq 0) {
+        throw "No jobs found in the pipeline. Ensure the pipeline contains 'phases', 'jobs', or 'stages'."
+    }
+
     return $workflow
 }
+
 
 
 function Write-GitHubActionsWorkflow {
