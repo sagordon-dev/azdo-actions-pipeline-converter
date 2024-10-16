@@ -8,7 +8,7 @@ The script reads an Azure DevOps pipeline file (in JSON or YAML format), convert
 .PARAMETER azdoPipelineFile
 The path to the Azure DevOps pipeline file to be converted.
 
-.PARAMETER ghActionsWorkflowFile
+.PARAMETER ghActionsWorkflowFileName
 The path to the output GitHub Actions workflow file.
 
 .EXAMPLE
@@ -201,7 +201,7 @@ function Write-GitHubActionsWorkflow {
 
 try {
     Install-RequiredModules
-    Import-Module powershell-yaml
+    Import-Module -Name powershell-yaml -ErrorAction Stop
 
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
 
