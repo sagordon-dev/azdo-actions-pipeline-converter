@@ -34,7 +34,12 @@ function Install-RequiredModules {
     foreach ($module in $modules) {
         if (-not (Get-Module -ListAvailable -Name $module)) {
             Write-Host "Installing module: $module"
-            Install-Module -Name $module -Force -Scope CurrentUser
+            try {
+                Install-Module -Name $module -Force -Scope CurrentUser -ErrorAction Stop
+            }
+            catch {
+                throw "Failed to install module: $module. Error: $_"
+            }
         }
     }
 }
@@ -191,7 +196,13 @@ function Write-GitHubActionsWorkflow {
             New-Item -ItemType Directory -Path $outputDir -Force
         }
 
-        $yamlContent = ConvertTo-Yaml -Object $Workflow
+        try {
+            $yamlContent = ConvertTo-Yaml -Object $Workflow -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to convert to YAML. Ensure the 'powershell-yaml' module is installed. Error: $_"
+        }
+
         Set-Content -Path $OutputFile -Value $yamlContent
     }
     catch {
@@ -205,7 +216,6 @@ try {
 
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
 
-    # Ensure the output directory exists or create it
     $outputDir = ".github/workflows"
     if (-Not (Test-Path -Path $outputDir)) {
         New-Item -ItemType Directory -Path $outputDir -Force
