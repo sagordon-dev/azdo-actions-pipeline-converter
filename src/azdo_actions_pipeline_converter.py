@@ -1,15 +1,12 @@
-"""
-This script converts Azure DevOps pipeline to GitHub Actions workflow in YAML format.
-It is written in Python 3.12.3 and tested on Windows 11 with Python 3.12.3.
-It supports both JSON and YAML Azure DevOps pipeline files.
-"""
-
 import os
 import sys
 import json
 import yaml
 import argparse
-import re
+import logging
+
+def setup_logging():
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_pipeline_file(pipeline_file):
     """
@@ -17,7 +14,8 @@ def get_pipeline_file(pipeline_file):
     Supports both JSON and YAML formats.
     """
     if not os.path.isfile(pipeline_file):
-        raise FileNotFoundError(f"The file {pipeline_file} does not exist.")
+        logging.error(f"The file {pipeline_file} does not exist.")
+        sys.exit(1)
     
     with open(pipeline_file, 'r') as file:
         if pipeline_file.endswith('.json'):
@@ -25,55 +23,98 @@ def get_pipeline_file(pipeline_file):
         elif pipeline_file.endswith('.yaml') or pipeline_file.endswith('.yml'):
             return yaml.safe_load(file)
         else:
-            raise ValueError("Unsupported file format. Please provide a .json or .yaml file.")
-
-def get_github_actions_workflow(pipeline):
-    try:
-        if 'phases' not in pipeline:
-            print(f"Error: 'phases' key not found in pipeline. Pipeline content: {pipeline}")
+            logging.error("Unsupported file format. Please provide a .json or .yaml file.")
             sys.exit(1)
-        
-        workflow = {}
-        workflow['name'] = pipeline['name']
-        workflow['on'] = ['push', 'pull_request']
-        workflow['jobs'] = {}
-        job = {}
-        job['runs-on'] = 'ubuntu-latest'
-        job['steps'] = []
-        phases = pipeline['phases']
-        
-        for step in pipeline['phases'][0]['steps']:
-            step_dict = {}
-            step_dict['name'] = step['displayName']
-            step_dict['run'] = step['script']
-            job['steps'].append(step_dict)
-        workflow['jobs']['build'] = job
-        return workflow
-    except Exception as e:
-        print(f"Error: {e}")
+
+def convert_pipeline_to_workflow(pipeline):
+    """
+    Converts the Azure DevOps pipeline to a GitHub Actions workflow.
+    """
+    workflow = {
+        'name': pipeline.get('name', 'CI Pipeline'),
+        'on': {
+            'push': {'branches': ['main']},
+            'pull_request': {'branches': ['main']}
+        },
+        'jobs': {}
+    }
+
+    if 'trigger' in pipeline:
+        workflow['on']['push']['branches'] = pipeline['trigger'].get('branches', ['main'])
+
+    if 'pr' in pipeline:
+        workflow['on']['pull_request']['branches'] = pipeline['pr'].get('branches', ['main'])
+
+    if 'variables' in pipeline:
+        workflow['env'] = {k: v for k, v in pipeline['variables'].items()}
+
+    if 'variableGroups' in pipeline:
+        for group in pipeline['variableGroups']:
+            for variable in group['variables']:
+                workflow['env'][variable['name']] = variable['value']
+
+    if 'resources' in pipeline:
+        workflow['resources'] = {}
+        if 'repositories' in pipeline['resources']:
+            workflow['resources']['repositories'] = [
+                {'repository': repo['repository'], 'type': repo['type'], 'ref': repo['ref']}
+                for repo in pipeline['resources']['repositories']
+            ]
+
+    if 'phases' in pipeline:
+        for phase in pipeline['phases']:
+            job_name = phase['name']
+            workflow['jobs'][job_name] = {
+                'runs-on': 'ubuntu-latest',
+                'steps': [{'name': step['displayName'], 'run': step['script']} for step in phase['steps']]
+            }
+    elif 'jobs' in pipeline:
+        for job in pipeline['jobs']:
+            job_name = job['job']
+            workflow['jobs'][job_name] = {
+                'runs-on': 'ubuntu-latest',
+                'steps': [{'name': step['displayName'], 'run': step['script']} for step in job['steps']]
+            }
+    elif 'stages' in pipeline:
+        for stage in pipeline['stages']:
+            for job in stage['jobs']:
+                job_name = job['job']
+                workflow['jobs'][job_name] = {
+                    'runs-on': 'ubuntu-latest',
+                    'steps': [{'name': step['displayName'], 'run': step['script']} for step in job['steps']]
+                }
+    else:
+        logging.error("Error: 'phases', 'jobs', or 'stages' key not found in pipeline.")
         sys.exit(1)
 
-def write_github_actions_workflow(workflow, output_file):
+    return workflow
+
+def write_workflow_to_file(workflow, output_file):
+    """
+    Writes the GitHub Actions workflow to a file.
+    """
     try:
         with open(output_file, 'w') as file:
             yaml.dump(workflow, file)
+        logging.info(f"GitHub Actions workflow file {output_file} is created successfully.")
     except Exception as e:
-        print(f"Error: {e}")
+        logging.error(f"Error writing workflow to file: {e}")
         sys.exit(1)
 
 def main():
+    setup_logging()
+    
     parser = argparse.ArgumentParser(description='Convert Azure DevOps pipeline to GitHub Actions workflow in YAML format.')
-    parser.add_argument('-i', '--input', help='Azure DevOps pipeline file in JSON format', required=True)
+    parser.add_argument('-i', '--input', help='Azure DevOps pipeline file in JSON or YAML format', required=True)
     parser.add_argument('-o', '--output', help='GitHub Actions workflow file in YAML format', required=True)
     args = parser.parse_args()
+
     pipeline_file = args.input
     output_file = args.output
+
     pipeline = get_pipeline_file(pipeline_file)
-    workflow = get_github_actions_workflow(pipeline)
-    write_github_actions_workflow(workflow, output_file)
-    print(f"GitHub Actions workflow file {output_file} is created successfully.")
+    workflow = convert_pipeline_to_workflow(pipeline)
+    write_workflow_to_file(workflow, output_file)
 
 if __name__ == '__main__':
     main()
-
-# End of script
