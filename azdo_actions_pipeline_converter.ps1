@@ -185,7 +185,12 @@ function Write-GitHubActionsWorkflow {
         }
 
         if (-Not (Test-Path -Path $outputDir)) {
-            New-Item -ItemType Directory -Path $outputDir -Force
+            $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
+            if ($createDir -eq 'Y' -or $createDir -eq 'y') {
+                New-Item -ItemType Directory -Path $outputDir -Force
+            } else {
+                throw "Output directory '$outputDir' does not exist and was not created."
+            }
         }
 
         $yamlContent = ConvertTo-Yaml -Object $Workflow
