@@ -134,6 +134,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
     elseif ($Pipeline.ContainsKey('stages')) {
         Write-Host "Processing stages..."
         $stages = $Pipeline.stages
+        Write-Host "Stages content: $($stages | Out-String)"
         foreach ($stage in $stages) {
             foreach ($job in $stage.jobs) {
                 $jobName = $job.job
@@ -161,6 +162,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
 
     return $workflow
 }
+
 
 
 
