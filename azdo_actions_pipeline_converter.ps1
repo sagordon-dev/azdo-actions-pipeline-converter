@@ -97,28 +97,6 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         }
     }
 
-    if ($Pipeline.ContainsKey('variableGroups')) {
-        foreach ($group in $Pipeline.variableGroups) {
-            foreach ($variable in $group.variables) {
-                $workflow.env[$variable.name] = $variable.value
-            }
-        }
-    }
-
-    if ($Pipeline.ContainsKey('resources')) {
-        $workflow.resources = @{}
-        if ($Pipeline.resources.ContainsKey('repositories')) {
-            $workflow.resources.repositories = @()
-            foreach ($repo in $Pipeline.resources.repositories) {
-                $workflow.resources.repositories += @{
-                    repository = $repo.repository
-                    type       = $repo.type
-                    ref        = $repo.ref
-                }
-            }
-        }
-    }
-
     if ($Pipeline.ContainsKey('phases')) {
         $phases = $Pipeline.phases
         foreach ($phase in $phases) {
@@ -175,6 +153,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
 
     return $workflow
 }
+
 
 function Write-GitHubActionsWorkflow {
     param (
