@@ -185,12 +185,7 @@ function Write-GitHubActionsWorkflow {
         }
 
         if (-Not (Test-Path -Path $outputDir)) {
-            $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
-            if ($createDir -eq 'Y' -or $createDir -eq 'y') {
-                New-Item -ItemType Directory -Path $outputDir -Force
-            } else {
-                throw "Output directory '$outputDir' does not exist and was not created."
-            }
+            New-Item -ItemType Directory -Path $outputDir -Force
         }
 
         $yamlContent = ConvertTo-Yaml -Object $Workflow
@@ -206,20 +201,10 @@ try {
 
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
 
-    # Prompt for output directory
-    $defaultOutputDir = ".github/workflows"
-    $outputDir = Read-Host "Enter the output directory for the GitHub Actions workflow (default: $defaultOutputDir)"
-    if ([string]::IsNullOrWhiteSpace($outputDir)) {
-        $outputDir = $defaultOutputDir
-    }
-
+    # Ensure the output directory exists or create it
+    $outputDir = ".github/workflows"
     if (-Not (Test-Path -Path $outputDir)) {
-        $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
-        if ($createDir -eq 'Y' -or $createDir -eq 'y') {
-            New-Item -ItemType Directory -Path $outputDir -Force
-        } else {
-            throw "Output directory '$outputDir' does not exist and was not created."
-        }
+        New-Item -ItemType Directory -Path $outputDir -Force
     }
 
     $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
