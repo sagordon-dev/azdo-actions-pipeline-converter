@@ -187,10 +187,8 @@ function Write-GitHubActionsWorkflow {
             throw "Output file path is empty or null."
         }
 
-        $outputDir = [System.IO.Path]::GetDirectoryName((Resolve-Path $OutputFile).Path)
-        if ([string]::IsNullOrWhiteSpace($outputDir)) {
-            throw "Output directory path is empty or null."
-        }
+        $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
+        Write-Host "Output directory: $outputDir"
 
         if (-Not (Test-Path -Path $outputDir)) {
             New-Item -ItemType Directory -Path $outputDir -Force
