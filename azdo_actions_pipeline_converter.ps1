@@ -83,55 +83,19 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
     }
 
     if ($Pipeline.ContainsKey('trigger')) {
-        $workflow.on.push.branches = $Pipeline.trigger.branches
-    }
-
-    if ($Pipeline.ContainsKey('pr')) {
-        $workflow.on.pull_request.branches = $Pipeline.pr.branches
+        $workflow.on.push.branches = $Pipeline.trigger.branches.include
     }
 
     if ($Pipeline.ContainsKey('variables')) {
         $workflow.env = @{}
-        foreach ($key in $Pipeline.variables.Keys) {
-            $workflow.env[$key] = $Pipeline.variables[$key]
+        foreach ($variable in $Pipeline.variables) {
+            if ($variable.ContainsKey('name')) {
+                $workflow.env[$variable.name] = $variable.value
+            }
         }
     }
 
-    if ($Pipeline.ContainsKey('phases')) {
-        Write-Host "Processing phases..."
-        $phases = $Pipeline.phases
-        foreach ($phase in $phases) {
-            $jobName = $phase.name
-            $workflow.jobs[$jobName] = @{
-                'runs-on' = 'ubuntu-latest'
-                steps     = @()
-            }
-            foreach ($step in $phase.steps) {
-                $workflow.jobs[$jobName].steps += @{
-                    name = $step.displayName
-                    run  = $step.script
-                }
-            }
-        }
-    }
-    elseif ($Pipeline.ContainsKey('jobs')) {
-        Write-Host "Processing jobs..."
-        $jobs = $Pipeline.jobs
-        foreach ($job in $jobs) {
-            $jobName = $job.job
-            $workflow.jobs[$jobName] = @{
-                'runs-on' = 'ubuntu-latest'
-                steps     = @()
-            }
-            foreach ($step in $job.steps) {
-                $workflow.jobs[$jobName].steps += @{
-                    name = $step.displayName
-                    run  = $step.script
-                }
-            }
-        }
-    }
-    elseif ($Pipeline.ContainsKey('stages')) {
+    if ($Pipeline.ContainsKey('stages')) {
         Write-Host "Processing stages..."
         $stages = $Pipeline.stages
         Write-Host "Stages content: $($stages | Out-String)"
@@ -151,13 +115,25 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                     }
                 }
             }
+            elseif ($stage.ContainsKey('template')) {
+                Write-Host "Processing template: $($stage.template)"
+                # Handle template logic here if needed
+                # For now, we'll skip templates
+            }
+            elseif ($stage.ContainsKey('parameters')) {
+                Write-Host "Processing parameters: $($stage.parameters | Out-String)"
+                # Handle parameters logic here if needed
+                # For now, we'll skip parameters
+            }
+            elseif ($stage.ContainsKey('if')) {
+                Write-Host "Processing conditional stage: $($stage.if)"
+                # Handle conditional logic here if needed
+                # For now, we'll skip conditional stages
+            }
             else {
                 Write-Host "Skipping stage without jobs: $($stage | Out-String)"
             }
         }
-    }
-    else {
-        throw "Error: 'phases', 'jobs', or 'stages' key not found in pipeline. Pipeline content: $Pipeline"
     }
 
     # Ensure jobs are not empty
@@ -167,6 +143,61 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
 
     return $workflow
 }
+
+function Write-GitHubActionsWorkflow {
+    param (
+        [hashtable]$Workflow,
+        [string]$OutputFile
+    )
+
+    try {
+        if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+            throw "Output file path is empty or null."
+        }
+
+        $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
+        Write-Host "Output directory: $outputDir"
+
+        if (-Not (Test-Path -Path $outputDir)) {
+            New-Item -ItemType Directory -Path $outputDir -Force
+        }
+
+        try {
+            $yamlContent = $Workflow | ConvertTo-Yaml -ErrorAction Stop
+        }
+        catch {
+            throw "Failed to convert to YAML. Ensure the 'powershell-yaml' module is installed. Error: $_"
+        }
+
+        Set-Content -Path $OutputFile -Value $yamlContent
+    }
+    catch {
+        throw "Error: $_"
+    }
+}
+
+try {
+    Install-RequiredModules
+    Import-Module -Name powershell-yaml -ErrorAction Stop
+
+    $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
+
+    $outputDir = ".github/workflows"
+    if (-Not (Test-Path -Path $outputDir)) {
+        New-Item -ItemType Directory -Path $outputDir -Force
+    }
+
+    $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFileName
+
+    $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
+    Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
+
+    Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
+}
+catch {
+    Write-Error $_
+}
+
 
 function Write-GitHubActionsWorkflow {
     param (
