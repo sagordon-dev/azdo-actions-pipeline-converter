@@ -195,7 +195,8 @@ function Write-GitHubActionsWorkflow {
         }
 
         try {
-            $yamlContent = ConvertTo-Yaml -Object $Workflow -ErrorAction Stop
+            # Adjusted the ConvertTo-Yaml call
+            $yamlContent = $Workflow | ConvertTo-Yaml -ErrorAction Stop
         }
         catch {
             throw "Failed to convert to YAML. Ensure the 'powershell-yaml' module is installed. Error: $_"
@@ -207,6 +208,7 @@ function Write-GitHubActionsWorkflow {
         throw "Error: $_"
     }
 }
+
 
 try {
     Install-RequiredModules
