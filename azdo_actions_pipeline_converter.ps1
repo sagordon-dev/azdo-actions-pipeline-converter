@@ -28,6 +28,14 @@ param (
     [string]$ghActionsWorkflowFile
 )
 
+# Ensure the output directory exists or create it
+$outputDir = ".github/workflows"
+if (-Not (Test-Path -Path $outputDir)) {
+    New-Item -ItemType Directory -Path $outputDir -Force
+}
+
+$ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
+
 function Install-RequiredModules {
     $modules = @('powershell-yaml')
 
@@ -187,27 +195,19 @@ function Write-GitHubActionsWorkflow {
         if (-Not (Test-Path -Path $outputDir)) {
             New-Item -ItemType Directory -Path $outputDir -Force
         }
-
-        $yamlContent = ConvertTo-Yaml -Object $Workflow
-        Set-Content -Path $OutputFile -Value $yamlContent
-    } catch {
-        throw "Error: $_"
-    }
-}
-
 try {
     Install-RequiredModules
-    Import-Module powershell-yaml
+    Import-Module -Name powershell-yaml -ErrorAction Stop
 
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
 
-    # Ensure the output directory exists or create it
-    $outputDir = ".github/workflows"
-    if (-Not (Test-Path -Path $outputDir)) {
-        New-Item -ItemType Directory -Path $outputDir -Force
-    }
+    $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
+    Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
 
-    $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
+    Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
+} catch {
+    Write-Error $_
+}   $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
 
     $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
     Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
