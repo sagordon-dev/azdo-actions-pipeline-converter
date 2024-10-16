@@ -21,20 +21,12 @@ Ensure that the required modules for YAML serialization are installed and import
 #>
 
 param (
-    [Parameter(Mandatory=$true)]
+    [Parameter(Mandatory = $true)]
     [string]$azdoPipelineFile,
 
-    [Parameter(Mandatory=$true)]
-    [string]$ghActionsWorkflowFile
+    [Parameter(Mandatory = $true)]
+    [string]$ghActionsWorkflowFileName
 )
-
-# Ensure the output directory exists or create it
-$outputDir = ".github/workflows"
-if (-Not (Test-Path -Path $outputDir)) {
-    New-Item -ItemType Directory -Path $outputDir -Force
-}
-
-$ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
 
 function Install-RequiredModules {
     $modules = @('powershell-yaml')
@@ -62,7 +54,7 @@ function Get-PipelineFile {
     switch ($extension) {
         ".json" { return $content | ConvertFrom-Json }
         ".yaml" { return $content | ConvertFrom-Yaml }
-        ".yml"  { return $content | ConvertFrom-Yaml }
+        ".yml" { return $content | ConvertFrom-Yaml }
         default { throw "Unsupported file format. Please provide a .json or .yaml file." }
     }
 }
@@ -75,7 +67,7 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
     $workflow = @{
         name = $Pipeline.name
         on   = @{
-            push = @{
+            push         = @{
                 branches = @('main')
             }
             pull_request = @{
@@ -137,7 +129,8 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                 }
             }
         }
-    } elseif ($Pipeline.ContainsKey('jobs')) {
+    }
+    elseif ($Pipeline.ContainsKey('jobs')) {
         $jobs = $Pipeline.jobs
         foreach ($job in $jobs) {
             $jobName = $job.job
@@ -152,7 +145,8 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                 }
             }
         }
-    } elseif ($Pipeline.ContainsKey('stages')) {
+    }
+    elseif ($Pipeline.ContainsKey('stages')) {
         $stages = $Pipeline.stages
         foreach ($stage in $stages) {
             foreach ($job in $stage.jobs) {
@@ -169,7 +163,8 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
                 }
             }
         }
-    } else {
+    }
+    else {
         throw "Error: 'phases', 'jobs', or 'stages' key not found in pipeline. Pipeline content: $Pipeline"
     }
 
@@ -195,24 +190,34 @@ function Write-GitHubActionsWorkflow {
         if (-Not (Test-Path -Path $outputDir)) {
             New-Item -ItemType Directory -Path $outputDir -Force
         }
+
+        $yamlContent = ConvertTo-Yaml -Object $Workflow
+        Set-Content -Path $OutputFile -Value $yamlContent
+    }
+    catch {
+        throw "Error: $_"
+    }
+}
+
 try {
     Install-RequiredModules
-    Import-Module -Name powershell-yaml -ErrorAction Stop
+    Import-Module powershell-yaml
 
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
 
+    # Ensure the output directory exists or create it
+    $outputDir = ".github/workflows"
+    if (-Not (Test-Path -Path $outputDir)) {
+        New-Item -ItemType Directory -Path $outputDir -Force
+    }
+
+    $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFileName
+
     $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
     Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
 
     Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
-} catch {
-    Write-Error $_
-}   $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
-
-    $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
-    Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
-
-    Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
-} catch {
+}
+catch {
     Write-Error $_
 }
