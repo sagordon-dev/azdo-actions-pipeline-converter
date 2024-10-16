@@ -203,9 +203,30 @@ function Write-GitHubActionsWorkflow {
 try {
     Install-RequiredModules
     Import-Module powershell-yaml
+
     $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
+
+    # Prompt for output directory
+    $defaultOutputDir = ".github/workflows"
+    $outputDir = Read-Host "Enter the output directory for the GitHub Actions workflow (default: $defaultOutputDir)"
+    if ([string]::IsNullOrWhiteSpace($outputDir)) {
+        $outputDir = $defaultOutputDir
+    }
+
+    if (-Not (Test-Path -Path $outputDir)) {
+        $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
+        if ($createDir -eq 'Y' -or $createDir -eq 'y') {
+            New-Item -ItemType Directory -Path $outputDir -Force
+        } else {
+            throw "Output directory '$outputDir' does not exist and was not created."
+        }
+    }
+
+    $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFile
+
     $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
     Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
+
     Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
 } catch {
     Write-Error $_
