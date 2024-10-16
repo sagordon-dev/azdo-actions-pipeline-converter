@@ -136,18 +136,23 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         $stages = $Pipeline.stages
         Write-Host "Stages content: $($stages | Out-String)"
         foreach ($stage in $stages) {
-            foreach ($job in $stage.jobs) {
-                $jobName = $job.job
-                $workflow.jobs[$jobName] = @{
-                    'runs-on' = 'ubuntu-latest'
-                    steps     = @()
-                }
-                foreach ($step in $job.steps) {
-                    $workflow.jobs[$jobName].steps += @{
-                        name = $step.displayName
-                        run  = $step.script
+            if ($stage.ContainsKey('jobs')) {
+                foreach ($job in $stage.jobs) {
+                    $jobName = $job.job
+                    $workflow.jobs[$jobName] = @{
+                        'runs-on' = 'ubuntu-latest'
+                        steps     = @()
+                    }
+                    foreach ($step in $job.steps) {
+                        $workflow.jobs[$jobName].steps += @{
+                            name = $step.displayName
+                            run  = $step.script
+                        }
                     }
                 }
+            }
+            else {
+                Write-Host "Skipping stage without jobs: $($stage | Out-String)"
             }
         }
     }
@@ -162,10 +167,6 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
 
     return $workflow
 }
-
-
-
-
 
 function Write-GitHubActionsWorkflow {
     param (
