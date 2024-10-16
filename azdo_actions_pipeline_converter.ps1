@@ -1,24 +1,224 @@
-try {
-    if ([string]::IsNullOrWhiteSpace($OutputFile)) {
-        throw "Output file path is empty or null."
-    }
+<#
+.SYNOPSIS
+This script converts an Azure DevOps pipeline to a GitHub Actions workflow in YAML format.
 
-    $outputDir = [System.IO.Path]::GetDirectoryName((Resolve-Path $OutputFile).Path)
-    if ([string]::IsNullOrWhiteSpace($outputDir)) {
-        throw "Output directory path is empty or null."
-    }
+.DESCRIPTION
+The script reads an Azure DevOps pipeline file (in JSON or YAML format), converts it to a GitHub Actions workflow, and saves the workflow to a specified file. It supports both JSON and YAML Azure DevOps pipeline files.
 
-    if (-Not (Test-Path -Path $outputDir)) {
-        $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
-        if ($createDir -eq 'Y' -or $createDir -eq 'y') {
-            New-Item -ItemType Directory -Path $outputDir -Force
-        } else {
-            throw "Output directory '$outputDir' does not exist and was not created."
+.PARAMETER azdoPipelineFile
+The path to the Azure DevOps pipeline file to be converted.
+
+.PARAMETER ghActionsWorkflowFile
+The path to the output GitHub Actions workflow file.
+
+.EXAMPLE
+.\azdo_actions_pipeline_converter.ps1 -azdoPipelineFile "azure-pipelines.yml" -ghActionsWorkflowFile "github-actions.yml"
+This command converts the Azure DevOps pipeline file "azure-pipelines.yml" to a GitHub Actions workflow file "github-actions.yml".
+
+.NOTES
+Written in PowerShell 5.1 and tested on Windows 11 with PowerShell 5.1.
+Ensure that the required modules for YAML serialization are installed and imported.
+#>
+
+param (
+    [Parameter(Mandatory = $true)]
+    [string]$azdoPipelineFile,
+
+    [Parameter(Mandatory = $true)]
+    [string]$ghActionsWorkflowFile
+)
+
+function Install-RequiredModules {
+    $modules = @('powershell-yaml')
+
+    foreach ($module in $modules) {
+        if (-not (Get-Module -ListAvailable -Name $module)) {
+            Write-Host "Installing module: $module"
+            Install-Module -Name $module -Force -Scope CurrentUser
         }
+    }
+}
+
+function Get-PipelineFile {
+    param (
+        [string]$PipelineFile
+    )
+
+    if (-Not (Test-Path -Path $PipelineFile)) {
+        throw "The file $PipelineFile does not exist."
+    }
+
+    $extension = [System.IO.Path]::GetExtension($PipelineFile).ToLower()
+    $content = Get-Content -Path $PipelineFile -Raw
+
+    switch ($extension) {
+        ".json" { return $content | ConvertFrom-Json }
+        ".yaml" { return $content | ConvertFrom-Yaml }
+        ".yml" { return $content | ConvertFrom-Yaml }
+        default { throw "Unsupported file format. Please provide a .json or .yaml file." }
+    }
+}
+
+function Convert-AzdoPipelineToGhActionsWorkflow {
+    param (
+        [hashtable]$Pipeline
+    )
+
+    $workflow = @{
+        name = $Pipeline.name
+        on   = @{
+            push         = @{
+                branches = @('main')
+            }
+            pull_request = @{
+                branches = @('main')
+            }
+        }
+        jobs = @{}
+    }
+
+    if ($Pipeline.ContainsKey('trigger')) {
+        $workflow.on.push.branches = $Pipeline.trigger.branches
+    }
+
+    if ($Pipeline.ContainsKey('pr')) {
+        $workflow.on.pull_request.branches = $Pipeline.pr.branches
+    }
+
+    if ($Pipeline.ContainsKey('variables')) {
+        $workflow.env = @{}
+        foreach ($key in $Pipeline.variables.Keys) {
+            $workflow.env[$key] = $Pipeline.variables[$key]
+        }
+    }
+
+    if ($Pipeline.ContainsKey('variableGroups')) {
+        foreach ($group in $Pipeline.variableGroups) {
+            foreach ($variable in $group.variables) {
+                $workflow.env[$variable.name] = $variable.value
+            }
+        }
+    }
+
+    if ($Pipeline.ContainsKey('resources')) {
+        $workflow.resources = @{}
+        if ($Pipeline.resources.ContainsKey('repositories')) {
+            $workflow.resources.repositories = @()
+            foreach ($repo in $Pipeline.resources.repositories) {
+                $workflow.resources.repositories += @{
+                    repository = $repo.repository
+                    type       = $repo.type
+                    ref        = $repo.ref
+                }
+            }
+        }
+    }
+
+    if ($Pipeline.ContainsKey('phases')) {
+        $phases = $Pipeline.phases
+        foreach ($phase in $phases) {
+            $jobName = $phase.name
+            $workflow.jobs[$jobName] = @{
+                'runs-on' = 'ubuntu-latest'
+                steps     = @()
+            }
+            foreach ($step in $phase.steps) {
+                $workflow.jobs[$jobName].steps += @{
+                    name = $step.displayName
+                    run  = $step.script
+                }
+            }
+        }
+    }
+    elseif ($Pipeline.ContainsKey('jobs')) {
+        $jobs = $Pipeline.jobs
+        foreach ($job in $jobs) {
+            $jobName = $job.job
+            $workflow.jobs[$jobName] = @{
+                'runs-on' = 'ubuntu-latest'
+                steps     = @()
+            }
+            foreach ($step in $job.steps) {
+                $workflow.jobs[$jobName].steps += @{
+                    name = $step.displayName
+                    run  = $step.script
+                }
+            }
+        }
+    }
+    elseif ($Pipeline.ContainsKey('stages')) {
+        $stages = $Pipeline.stages
+        foreach ($stage in $stages) {
+            foreach ($job in $stage.jobs) {
+                $jobName = $job.job
+                $workflow.jobs[$jobName] = @{
+                    'runs-on' = 'ubuntu-latest'
+                    steps     = @()
+                }
+                foreach ($step in $job.steps) {
+                    $workflow.jobs[$jobName].steps += @{
+                        name = $step.displayName
+                        run  = $step.script
+                    }
+                }
+            }
+        }
+    }
+    else {
+        throw "Error: 'phases', 'jobs', or 'stages' key not found in pipeline. Pipeline content: $Pipeline"
+    }
+
+    return $workflow
+}
+
+function Write-GitHubActionsWorkflow {
+    param (
+        [hashtable]$Workflow,
+        [string]$OutputFile
+    )
+
+    try {
+        if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+            throw "Output file path is empty or null."
+        }
+    
+        $outputDir = [System.IO.Path]::GetDirectoryName((Resolve-Path $OutputFile).Path)
+        if ([string]::IsNullOrWhiteSpace($outputDir)) {
+            throw "Output directory path is empty or null."
+        }
+    
+        if (-Not (Test-Path -Path $outputDir)) {
+            $createDir = Read-Host "Output directory '$outputDir' does not exist. Do you want to create it? (Y/N)"
+            if ($createDir -eq 'Y' -or $createDir -eq 'y') {
+                New-Item -ItemType Directory -Path $outputDir -Force
+            }
+            else {
+                throw "Output directory '$outputDir' does not exist and was not created."
+            }
+        }
+    
+        $yamlContent = ConvertTo-Yaml -Object $Workflow
+        Set-Content -Path $OutputFile -Value $yamlContent
+    }
+    catch {
+        throw "Error: $_"
     }
 
     $yamlContent = ConvertTo-Yaml -Object $Workflow
     Set-Content -Path $OutputFile -Value $yamlContent
-} catch {
+}
+catch {
     throw "Error: $_"
+}
+
+try {
+    Install-RequiredModules
+    Import-Module powershell-yaml
+    $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
+    $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
+    Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
+    Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
+}
+catch {
+    Write-Error $_
 }
