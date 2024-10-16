@@ -181,9 +181,6 @@ function Write-GitHubActionsWorkflow {
 
         $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
         if (-not $outputDir) {
-            $outputDir = "."
-        }
-        if ([string]::IsNullOrWhiteSpace($outputDir)) {
             throw "Output directory path is empty or null."
         }
 
@@ -201,16 +198,6 @@ function Write-GitHubActionsWorkflow {
     } catch {
         throw "Error: $_"
     }
-}
-
-function ConvertTo-Yaml {
-    param (
-        [Parameter(Mandatory=$true)]
-        [object]$Object
-    )
-
-    $yamlContent = $Object | ConvertTo-Yaml
-    return $yamlContent
 }
 
 try {
