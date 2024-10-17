@@ -1,111 +1,66 @@
 # Azure DevOps to GitHub Actions Pipeline Converter
 
-This script converts an Azure DevOps pipeline to a GitHub Actions workflow in YAML format.
+This script converts an Azure DevOps pipeline to a GitHub Actions workflow in YAML format. It reads an Azure DevOps pipeline file (in JSON or YAML format), converts it to a GitHub Actions workflow, and saves the workflow to a specified file. The script supports both JSON and YAML Azure DevOps pipeline files.
 
-## Requirements
-
-- Python 3.12.3
-- `pyyaml` library
+## Prerequisites
+- **PowerShell 5.1 or later**: Ensure you have PowerShell installed on your machine.
+- **Required Modules**: The script requires the `powershell-yaml` module for YAML serialization. The script will automatically install this module if it is not already installed.
 
 ## Installation
+1. **Clone the Repository**:
+   ```sh
+   git clone <repository-url>
+   cd <repository-directory>
 
-1. Clone the repository:
-    ```bash
-    git clone https://github.com/your-repo/azdo-actions-pipeline-converter.git
-    cd azdo-actions-pipeline-converter
-    ```
-
-2. Create a virtual environment:
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
-
-3. Install the required libraries:
-    ```bash
-    pip install -r requirements.txt
-    ```
+2. **Ensure PowerShell is Installed**:
+    * For Windows: PowerShell is pre-installed.
+    * For macOS/Linux: Follow the instructions here to install PowerShell.
 
 ## Usage
+1. **Open PowerShell**:
 
-1. Place your Azure DevOps pipeline JSON file in the `src` directory.
+    * On Windows, you can open PowerShell by searching for it in the Start menu.
+    * On macOS/Linux, open your terminal and type pwsh to start PowerShell.
 
-2. Run the script:
-    ```bash
-    python src/azdo_actions_pipeline_converter.py --pipeline-file <path_to_pipeline_file> --output-file <path_to_output_file>
-    ```
-
-    - `--pipeline-file`: Path to the Azure DevOps pipeline JSON file.
-    - `--output-file`: Path to save the generated GitHub Actions workflow YAML file.
-
-## Example
-
+2. **Navigate to the Script Directory**:
 ```bash
-python src/azdo_actions_pipeline_converter.py --pipeline-file src/azure-pipeline.json --output-file .github/workflows/ci.yml
+cd path/to/your/script
 ```
 
-## Running Tests
-
-1. Ensure you are in the virtual environment:
-
+3. **Run the Script**:
 ```bash
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+.\azdo_actions_pipeline_converter.ps1 -azdoPipelineFile "path/to/azure-pipelines.yml" -ghActionsWorkflowFileName "path/to/github-actions.yml"
 ```
+    * azdoPipelineFile: The path to the Azure DevOps pipeline file to be converted.
+    * ghActionsWorkflowFileName: The path to the output GitHub Actions workflow file.
 
-2. Run the tests:
-
+### Example
+To convert an Azure DevOps pipeline file named azure-pipelines.yml to a GitHub Actions workflow file named github-actions.yml, run the following command:
 ```bash
-python3 -m unittest discover -s tests
+.\azdo_actions_pipeline_converter.ps1 -azdoPipelineFile "azure-pipelines.yml" -ghActionsWorkflowFileName "github-actions.yml"
 ```
 
-## File Structure
-```
-project/
-│
-├── src/
-│   └── azdo-actions-pipeline-converter.py
-│
-├── tests/
-│   └── test_azdo_actions_pipeline_converter.py
-│
-├── .gitignore
-├── requirements.txt
-└── README.md
-```
+## Script Details
 
-## License
+### Parameters
+* `azdoPipelineFile`: The path to the Azure DevOps pipeline file to be converted. This parameter is mandatory.
+* `ghActionsWorkflowFileName`: The path to the output GitHub Actions workflow file. This parameter is mandatory.
 
-This project is licensed under the MIT License.
+### Functions
+* `Install-RequiredModules`: Installs the required PowerShell modules if they are not already installed.
+* `Get-PipelineFile`: Reads the Azure DevOps pipeline file and converts it to a PowerShell object.
+* `Convert-AzdoPipelineToGhActionsWorkflow`: Converts the Azure DevOps pipeline object to a GitHub Actions workflow object.
+* `Write-GitHubActionsWorkflow`: Writes the GitHub Actions workflow object to a YAML file.
 
-### Additional Steps
+### Troubleshooting
+* **Module Installation Issues**: If the script fails to install the required modules, ensure you have the necessary permissions to install PowerShell modules. You may need to run PowerShell as an administrator.
+* **File Path Issues**: Ensure the paths provided for the azdoPipelineFile and ghActionsWorkflowFileName parameters are correct and accessible.
+* **YAML Conversion Errors**: If there are issues with converting to YAML, ensure the powershell-yaml module is installed correctly.
 
-1. **Create `requirements.txt`**:
-   - Add the required libraries.
+### Contributing
+If you encounter any issues of have suggestions for improvements, feel free to open an issue or submit a pull request.
 
-```plaintext
-pyyaml
-```
+### License
+This project is licensed under the MIT License. See the LICENSE file for details.
 
-2. **Update `.gitignore:`**:
-* Ensure it includes the virtual environment directory.
-
-#### Virtual environment
-```bash
-venv/
-```
-
-#### Directory Structure
-
-```bash
-project/
-│
-├── src/
-│   └── azdo-actions-pipeline-converter.py
-│
-├── tests/
-│   └── test_azdo_actions_pipeline_converter.py
-│
-├── .gitignore
-├── requirements.txt
-└── README.md
-```
+For any further questions or support, please contact Scott at scott.gordon72@outlook.com.

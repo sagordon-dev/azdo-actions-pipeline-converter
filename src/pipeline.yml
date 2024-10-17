@@ -1,0 +1,85 @@
+trigger:
+  branches:
+    include:
+      - refs/heads/main
+      - refs/heads/develop
+  batch: true
+
+pr:
+  branches:
+    include:
+      - refs/heads/main
+      - refs/heads/develop
+
+resources:
+  repositories:
+    - repository: repository1
+      type: git
+      name: libraryName1
+      ref: main
+    - repository: repository2
+      type: git
+      name: libraryName2
+      ref: develop
+    - repository: repository3
+      type: git
+      name: libraryName3
+      ref: feature-branch
+
+variables:
+  - name: defaultPipelineAgentHost
+    value: 'default'
+  - group: PipelineVariableSet
+  - name: buildConfiguration
+    value: 'Release'
+  - name: buildPlatform
+    value: 'Any CPU'
+
+name: $(Build.SourceBranchName).$(Date:yyyyMMdd)$(rev:rr)
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildJob
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '5.x'
+              installationPath: $(Agent.ToolsDirectory)/dotnet
+          - script: dotnet build --configuration $(buildConfiguration)
+            displayName: 'Build project'
+
+  - stage: Test
+    dependsOn: Build
+    jobs:
+      - job: TestJob
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: dotnet test --configuration $(buildConfiguration)
+            displayName: 'Run tests'
+
+  - stage: Deploy
+    dependsOn: Test
+    jobs:
+      - job: DeployJob
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - script: echo "Deploying to environment"
+            displayName: 'Deploy to environment'
+
+  - template: deploy-stages/Terraform-Validate.yml
+    parameters:
+      param1: $(param1)
+      param2: ${{ variables.param2 }}
+
+  - ${{ if eq(variables['build.sourceBranch'], 'refs/heads/main') }}:
+    - template: deploy-stages/Terraform-Apply.yml
+      parameters:
+        StgName: dev_apply
+        param3: $(param3)
+        param4: ${{ param4 }}

@@ -95,30 +95,59 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
         }
     }
 
+    function Sanitize-JobName {
+        param (
+            [string]$Name
+        )
+        return $Name -replace '[^a-zA-Z0-9_-]', '_'
+    }
+
+    function Process-Jobs {
+        param (
+            [object]$Jobs
+        )
+
+        if ($Jobs -is [System.Collections.Hashtable]) {
+            $Jobs = @($Jobs)
+        }
+
+        foreach ($job in $Jobs) {
+            $jobName = Sanitize-JobName -Name $job.job
+            $workflow.jobs[$jobName] = @{
+                'runs-on' = 'ubuntu-latest'
+                steps     = @()
+            }
+            foreach ($step in $job.steps) {
+                $workflow.jobs[$jobName].steps += @{
+                    name = $step.displayName
+                    run  = $step.script
+                }
+            }
+        }
+    }
+
     if ($Pipeline.ContainsKey('stages')) {
         Write-Host "Processing stages..."
         $stages = $Pipeline.stages
         Write-Host "Stages content: $($stages | Out-String)"
         foreach ($stage in $stages) {
             if ($stage.ContainsKey('jobs')) {
-                foreach ($job in $stage.jobs) {
-                    $jobName = $job.job
-                    $workflow.jobs[$jobName] = @{
-                        'runs-on' = 'ubuntu-latest'
-                        steps     = @()
-                    }
-                    foreach ($step in $job.steps) {
-                        $workflow.jobs[$jobName].steps += @{
-                            name = $step.displayName
-                            run  = $step.script
-                        }
-                    }
-                }
+                Write-Host "Processing jobs in stage..."
+                Process-Jobs -Jobs $stage.jobs
             }
             elseif ($stage.ContainsKey('template')) {
                 Write-Host "Processing template: $($stage.template)"
-                # Handle template logic here if needed
-                # For now, we'll skip templates
+                # Simulate processing the template by adding a placeholder job
+                $jobName = Sanitize-JobName -Name "TemplateJob_$($stage.template)"
+                $workflow.jobs[$jobName] = @{
+                    'runs-on' = 'ubuntu-latest'
+                    steps     = @(
+                        @{
+                            name = "Run template $($stage.template)"
+                            run  = "echo Running template $($stage.template)"
+                        }
+                    )
+                }
             }
             elseif ($stage.ContainsKey('parameters')) {
                 Write-Host "Processing parameters: $($stage.parameters | Out-String)"
@@ -127,8 +156,12 @@ function Convert-AzdoPipelineToGhActionsWorkflow {
             }
             elseif ($stage.ContainsKey('if')) {
                 Write-Host "Processing conditional stage: $($stage.if)"
-                # Handle conditional logic here if needed
-                # For now, we'll skip conditional stages
+                # Process nested jobs within the conditional stage
+                foreach ($conditionalStage in $stage.'if') {
+                    if ($conditionalStage.ContainsKey('jobs')) {
+                        Process-Jobs -Jobs $conditionalStage.jobs
+                    }
+                }
             }
             else {
                 Write-Host "Skipping stage without jobs: $($stage | Out-String)"
@@ -175,63 +208,6 @@ function Write-GitHubActionsWorkflow {
         throw "Error: $_"
     }
 }
-
-try {
-    Install-RequiredModules
-    Import-Module -Name powershell-yaml -ErrorAction Stop
-
-    $pipeline = Get-PipelineFile -PipelineFile $azdoPipelineFile
-
-    $outputDir = ".github/workflows"
-    if (-Not (Test-Path -Path $outputDir)) {
-        New-Item -ItemType Directory -Path $outputDir -Force
-    }
-
-    $ghActionsWorkflowFile = Join-Path -Path $outputDir -ChildPath $ghActionsWorkflowFileName
-
-    $workflow = Convert-AzdoPipelineToGhActionsWorkflow -Pipeline $pipeline
-    Write-GitHubActionsWorkflow -Workflow $workflow -OutputFile $ghActionsWorkflowFile
-
-    Write-Host "GitHub Actions workflow file $ghActionsWorkflowFile is created successfully."
-}
-catch {
-    Write-Error $_
-}
-
-
-function Write-GitHubActionsWorkflow {
-    param (
-        [hashtable]$Workflow,
-        [string]$OutputFile
-    )
-
-    try {
-        if ([string]::IsNullOrWhiteSpace($OutputFile)) {
-            throw "Output file path is empty or null."
-        }
-
-        $outputDir = [System.IO.Path]::GetDirectoryName($OutputFile)
-        Write-Host "Output directory: $outputDir"
-
-        if (-Not (Test-Path -Path $outputDir)) {
-            New-Item -ItemType Directory -Path $outputDir -Force
-        }
-
-        try {
-            # Adjusted the ConvertTo-Yaml call
-            $yamlContent = $Workflow | ConvertTo-Yaml -ErrorAction Stop
-        }
-        catch {
-            throw "Failed to convert to YAML. Ensure the 'powershell-yaml' module is installed. Error: $_"
-        }
-
-        Set-Content -Path $OutputFile -Value $yamlContent
-    }
-    catch {
-        throw "Error: $_"
-    }
-}
-
 
 try {
     Install-RequiredModules
