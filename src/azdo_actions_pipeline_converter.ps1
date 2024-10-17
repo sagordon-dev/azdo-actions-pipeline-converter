@@ -12,7 +12,7 @@ The path to the Azure DevOps pipeline file to be converted.
 The path to the output GitHub Actions workflow file.
 
 .EXAMPLE
-.\azdo_actions_pipeline_converter.ps1 -azdoPipelineFile "azure-pipelines.yml" -ghActionsWorkflowFile "github-actions.yml"
+.\azdo_actions_pipeline_converter.ps1 -azdoPipelineFile "azure-pipelines.yml" -ghActionsWorkflowFileName "github-actions.yml"
 This command converts the Azure DevOps pipeline file "azure-pipelines.yml" to a GitHub Actions workflow file "github-actions.yml".
 
 .NOTES
@@ -230,3 +230,4 @@ try {
 catch {
     Write-Error $_
 }
+
